@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Which Pages Decline First? — Refresh Opportunity Scoring on the FlyRank Search Warehouse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=Work+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper: #EDEEE7;
+    --paper-raised: #F5F5F0;
+    --ink: #1B1F1D;
+    --ink-soft: #52584F;
+    --ink-faint: #8A8F82;
+    --decline: #B8611F;
+    --decline-soft: #E8CBAE;
+    --stable: #3F6D5C;
+    --stable-soft: #CFE0D6;
+    --data-accent: #2F4858;
+    --line: #D3D2C5;
+    --max-w: 720px;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+
+  *{ box-sizing: border-box; }
+
+  html{ scroll-behavior: smooth; }
+
+  body{
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Work Sans', sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap{
+    max-width: var(--max-w);
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  a{ color: var(--data-accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:hover{ color: var(--decline); }
+
+  code, .mono{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.88em;
+  }
+
+  /* ---------- Signal strip: recurring signature motif ---------- */
+  .signal-strip{
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 22px;
+    margin: 56px 0;
+    opacity: 0.9;
+  }
+  .signal-strip span{
+    flex: 1;
+    background: var(--stable);
+    border-radius: 1px 1px 0 0;
+    animation: rise 0.6s ease-out backwards;
+  }
+  @keyframes rise{ from{ transform: scaleY(0); } to{ transform: scaleY(1); } }
+  .signal-strip span:nth-child(1){ height:38%; background:var(--stable); animation-delay:0.02s;}
+  .signal-strip span:nth-child(2){ height:62%; background:var(--stable); animation-delay:0.06s;}
+  .signal-strip span:nth-child(3){ height:45%; background:var(--data-accent); animation-delay:0.10s;}
+  .signal-strip span:nth-child(4){ height:70%; background:var(--decline); animation-delay:0.14s;}
+  .signal-strip span:nth-child(5){ height:58%; background:var(--decline); animation-delay:0.18s;}
+  .signal-strip span:nth-child(6){ height:100%; background:var(--decline); animation-delay:0.22s;}
+  .signal-strip span:nth-child(7){ height:66%; background:var(--decline); animation-delay:0.26s;}
+  .signal-strip span:nth-child(8){ height:50%; background:var(--data-accent); animation-delay:0.30s;}
+  .signal-strip span:nth-child(9){ height:40%; background:var(--stable); animation-delay:0.34s;}
+  .signal-strip span:nth-child(10){ height:30%; background:var(--stable); animation-delay:0.38s;}
+  .signal-strip span:nth-child(11){ height:52%; background:var(--decline); animation-delay:0.42s;}
+  .signal-strip span:nth-child(12){ height:35%; background:var(--stable); animation-delay:0.46s;}
+
+  /* ---------- Hero ---------- */
+  .hero{
+    padding: 88px 0 20px;
+    border-bottom: 1px solid var(--line);
+  }
+  .eyebrow{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--decline);
+    margin-bottom: 18px;
+  }
+  h1{
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: clamp(2.1rem, 5vw, 3rem);
+    line-height: 1.08;
+    letter-spacing: -0.01em;
+    margin: 0 0 24px;
+    color: var(--ink);
+  }
+  h1 em{
+    font-style: italic;
+    font-weight: 500;
+    color: var(--decline);
+  }
+  .subhead{
+    font-size: 1.15rem;
+    color: var(--ink-soft);
+    max-width: 56ch;
+    margin: 0 0 32px;
+  }
+  .meta-row{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    padding-bottom: 32px;
+  }
+  .meta-row span b{ color: var(--ink-soft); font-weight: 500; }
+
+  /* ---------- Sections ---------- */
+  section{ padding: 8px 0 40px; }
+  .sec-label{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    color: var(--ink-faint);
+    margin-bottom: 10px;
+  }
+  h2{
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 1.7rem;
+    letter-spacing: -0.01em;
+    margin: 0 0 20px;
+    color: var(--ink);
+  }
+  h3{
+    font-family: 'Work Sans', sans-serif;
+    font-weight: 600;
+    font-size: 1.05rem;
+    margin: 28px 0 10px;
+    color: var(--ink);
+  }
+  p{ margin: 0 0 16px; color: var(--ink); }
+  ul, ol{ padding-left: 22px; margin: 0 0 16px; }
+  li{ margin-bottom: 8px; }
+
+  .callout{
+    background: var(--paper-raised);
+    border-left: 3px solid var(--data-accent);
+    padding: 16px 20px;
+    margin: 20px 0;
+    font-size: 0.95rem;
+    color: var(--ink-soft);
+  }
+  .callout.limit{ border-left-color: var(--decline); }
+  .callout b{ color: var(--ink); }
+
+  /* ---------- Abstract box ---------- */
+  .abstract{
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 28px 28px 22px;
+    margin: 8px 0 12px;
+  }
+  .abstract .sec-label{ margin-bottom: 14px; }
+  .abstract p{ font-size: 0.98rem; }
+
+  /* ---------- Stat row ---------- */
+  .stat-row{
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 24px 0;
+  }
+  .stat{
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 16px 14px;
+  }
+  .stat .n{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 1.5rem;
+    font-weight: 500;
+    color: var(--data-accent);
+    display: block;
+  }
+  .stat .l{
+    font-size: 0.78rem;
+    color: var(--ink-faint);
+    margin-top: 4px;
+    line-height: 1.3;
+  }
+  @media (max-width: 560px){ .stat-row{ grid-template-columns: 1fr 1fr; } }
+
+  /* ---------- Bar comparison chart ---------- */
+  .barchart{ margin: 22px 0 8px; }
+  .barchart .row{ margin-bottom: 16px; }
+  .barchart .row-label{
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    margin-bottom: 5px;
+  }
+  .barchart .row-label .val{ font-family:'IBM Plex Mono', monospace; color: var(--ink); }
+  .bar-track{
+    background: var(--line);
+    border-radius: 2px;
+    height: 14px;
+    overflow: hidden;
+  }
+  .bar-fill{
+    height: 100%;
+    border-radius: 2px;
+    transition: width 1s ease-out;
+  }
+  .bar-fill.model{ background: var(--decline); }
+  .bar-fill.baseline{ background: var(--ink-faint); }
+  .bar-fill.stable{ background: var(--stable); }
+
+  /* ---------- Heatmap ---------- */
+  .heatmap{
+    display: grid;
+    grid-template-columns: 90px repeat(4, 1fr);
+    gap: 3px;
+    margin: 20px 0;
+    font-size: 0.78rem;
+  }
+  .heatmap .hcell{
+    padding: 10px 6px;
+    text-align: center;
+    border-radius: 2px;
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--ink);
+  }
+  .heatmap .hlabel{
+    background: transparent;
+    text-align: right;
+    color: var(--ink-soft);
+    font-family: 'Work Sans', sans-serif;
+    padding-right: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+  }
+  .heatmap .corner{ background: transparent; }
+
+  /* ---------- Table ---------- */
+  table{ width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 0.88rem; }
+  th, td{ text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); }
+  th{ font-family:'IBM Plex Mono', monospace; font-weight:500; font-size:0.72rem; letter-spacing:0.04em; text-transform:uppercase; color: var(--ink-faint); }
+  td.num{ font-family:'IBM Plex Mono', monospace; }
+
+  .tag{
+    display: inline-block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 500;
+  }
+  .tag.refresh{ background: var(--decline-soft); color: #7A3E10; }
+  .tag.monitor{ background: #EDE6D0; color: #7A6A2E; }
+  .tag.protect{ background: var(--stable-soft); color: #21493A; }
+  .tag.prune{ background: #E4E3D9; color: var(--ink-soft); }
+
+  /* ---------- Recommendation distribution ---------- */
+  .action-dist{ display: flex; flex-direction: column; gap: 10px; margin: 20px 0; }
+  .action-row{ display: grid; grid-template-columns: 150px 1fr 60px; align-items: center; gap: 12px; font-size: 0.85rem; }
+  .action-row .abar{ height: 16px; border-radius: 2px; }
+
+  footer{
+    border-top: 1px solid var(--line);
+    padding: 40px 0 60px;
+    color: var(--ink-faint);
+    font-size: 0.85rem;
+  }
+  footer a{ color: var(--ink-soft); }
+
+  code.inline{
+    background: var(--paper-raised);
+    padding: 1px 6px;
+    border-radius: 3px;
+    border: 1px solid var(--line);
+  }
+
+  .toc{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 18px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    padding: 22px 0 0;
+  }
+  .toc a{ color: var(--ink-soft); }
+  .toc a:hover{ color: var(--decline); }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <!-- ============ HERO ============ -->
+  <div class="hero">
+    <div class="eyebrow">Search Intelligence Capstone — Refresh / Content Opportunity Scoring</div>
+    <h1>Which pages decline first, before a reviewer ever opens them?</h1>
+    <p class="subhead">A ranked scoring model for content review, built and validated on the FlyRank search warehouse — 142,816 content items, 90 days of signal, and one honest question: does a learned model actually beat a human's gut-feel ranking?</p>
+    <div class="meta-row">
+      <span><b>Lane:</b> Refresh / Content Opportunity Scoring</span>
+      <span><b>Dataset:</b> FlyRank internship warehouse</span>
+      <span><b>Model:</b> Random Forest, grouped validation</span>
+    </div>
+    <nav class="toc">
+      <a href="#abstract">Abstract</a>
+      <a href="#intro">Introduction</a>
+      <a href="#data">Data</a>
+      <a href="#method">Methodology</a>
+      <a href="#results">Results</a>
+      <a href="#limits">Limitations</a>
+      <a href="#recs">Recommendations</a>
+      <a href="#repro">Reproducibility</a>
+    </nav>
+  </div>
+
+  <!-- ============ ABSTRACT ============ -->
+  <section id="abstract">
+    <div class="signal-strip" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+    <div class="sec-label">01 — Abstract</div>
+    <div class="abstract">
+      <p><b>Question:</b> out of tens of thousands of content pages, which ones should a reviewer with limited time look at first? <b>Method:</b> a Random Forest classifier was trained on 90-day search-performance features (prior impressions, position volatility, query concentration) engineered directly from the full FlyRank search warehouse (~79M daily rows) via DuckDB, validated with a client-grouped split to test generalization to unseen clients. <b>Result:</b> the model reached a Precision@50 of 1.000 against a naive impressions-ranked baseline of 0.540, and its accuracy advantage over the base rate held up almost identically under both random and per-client validation (~0.165 uplift either way). <b>Framing:</b> this is decision-support, not causal proof — the label is a proxy for observed decline, not a verified outcome of any review action. <b>Output:</b> a four-category ranked action list (refresh, monitor, protect, prune) that a reviewer can act on directly.</p>
+    </div>
+  </section>
+
+  <!-- ============ INTRO ============ -->
+  <section id="intro">
+    <div class="sec-label">02 — Introduction</div>
+    <h2>The decision this supports</h2>
+    <p>A content reviewer at scale never has time to look at every page. Given hundreds of thousands of pages across a portfolio, the real question isn't "is this page declining" in the abstract — it's <b>which few pages deserve attention this week</b>, out of everything that could plausibly qualify.</p>
+    <p>Two kinds of mistakes matter here, and they don't cost the same. A false positive — flagging a page that's actually fine — wastes a reviewer's limited time. A false negative — missing a genuinely high-value page in real decline — lets real traffic loss go unnoticed. Because both matter, a useful model needs to be sharp at the top of its ranking, not just accurate on average across every page.</p>
+    <p>This is why the task is framed as <b>ranking</b>, not classification. A reviewer works down an ordered list; they don't receive one binary flag per page in isolation. The right evaluation metric follows from that: precision within the top of the ranking, not overall accuracy.</p>
+  </section>
+
+  <!-- ============ DATA ============ -->
+  <section id="data">
+    <div class="signal-strip" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+    <div class="sec-label">03 — Data</div>
+    <h2>The warehouse, not the sample</h2>
+    <p>The full pseudonymized FlyRank internship warehouse release was used, hosted as Parquet on Hugging Face and queried directly via DuckDB — no full download, only the columns and partitions each query touched.</p>
+    <div class="stat-row">
+      <div class="stat"><span class="n">78.8M</span><span class="l">rows in the daily content-performance fact table</span></div>
+      <div class="stat"><span class="n">104</span><span class="l">clients in the release (unbalanced history depth)</span></div>
+      <div class="stat"><span class="n">519,606</span><span class="l">distinct content items in the dimension table</span></div>
+    </div>
+    <p>Tables used: <code class="inline">dim_clients</code>, <code class="inline">dim_content</code>, <code class="inline">fact_content_daily_performance</code> (daily impressions, clicks, position), and <code class="inline">fact_content_query_90d</code> (query-level concentration signals). A 90-day trailing window was used per content item, split into a prior 45-day period (features) and a most-recent 45-day period (label).</p>
+    <p>After requiring a minimum prior-period impression volume (≥50) and dropping rows with missing feature values, <b>142,816 content items</b> qualified for the window, narrowing to <b>116,676 rows</b> after feature completeness checks.</p>
+    <div class="callout"><b>Excluded and why:</b> client, content, and query identifiers are pre-anonymized hashes in the released dataset itself — no raw client names, domains, or URLs appear anywhere in this paper, the underlying notebooks, or the repo. No credentials or private query text are referenced.</div>
+  </section>
+
+  <!-- ============ METHODOLOGY ============ -->
+  <section id="method">
+    <div class="sec-label">04 — Methodology</div>
+    <h2>Label, features, and the leakage check that mattered</h2>
+    <h3>Label definition (a proxy, stated plainly)</h3>
+    <p>A content item is labeled <b>declining</b> if its most-recent 45-day impressions fell below 80% of its prior 45-day impressions: <code class="inline">is_declining = imp_last45 &lt; 0.8 × imp_prev45</code>. This is a threshold-based proxy for "worth reviewing," not an observed outcome of any actual review or refresh action — no such outcome exists in this dataset.</p>
+    <h3>Features</h3>
+    <p>All features are computed from the <em>prior</em> 45-day window and query-mix signals only — never from the window the label is drawn from, which was the key leakage check applied throughout: <code class="inline">imp_prev45</code>, <code class="inline">pos_volatility</code> (standard deviation of average search position), <code class="inline">visible_queries</code>, <code class="inline">rare_share</code>, <code class="inline">anon_share</code>, and <code class="inline">top_query_share</code>.</p>
+    <h3>Why a fixed rule isn't enough</h3>
+    <p>Decline isn't a property of any single signal in isolation — it emerges from how several signals interact. The table below shows the real decline rate broken out by impression tier and content freshness tier, from the underlying dataset:</p>
+    <div class="heatmap">
+      <div class="hcell corner"></div>
+      <div class="hcell hlabel" style="justify-content:center;">0–30d</div>
+      <div class="hcell hlabel" style="justify-content:center;">31–90d</div>
+      <div class="hcell hlabel" style="justify-content:center;">91–180d</div>
+      <div class="hcell hlabel" style="justify-content:center;">181d+</div>
+
+      <div class="hcell hlabel">excellent</div>
+      <div class="hcell" style="background:#E3CDB0;">0.48</div>
+      <div class="hcell" style="background:#E9DCC6;">0.43</div>
+      <div class="hcell" style="background:#E9DCC6;">0.43</div>
+      <div class="hcell" style="background:#B8611F;color:#fff;">1.00</div>
+
+      <div class="hcell hlabel">good</div>
+      <div class="hcell" style="background:#D8AF80;">0.58</div>
+      <div class="hcell" style="background:#EDE2CF;">0.38</div>
+      <div class="hcell" style="background:#D4A876;">0.60</div>
+      <div class="hcell" style="background:#B8611F;color:#fff;">1.00</div>
+
+      <div class="hcell hlabel">low</div>
+      <div class="hcell" style="background:#E9DCC6;">0.42</div>
+      <div class="hcell" style="background:#C68A4C;">0.65</div>
+      <div class="hcell" style="background:#D4A876;">0.59</div>
+      <div class="hcell" style="background:#E9DCC6;">0.42</div>
+
+      <div class="hcell hlabel">moderate</div>
+      <div class="hcell" style="background:#D4A876;">0.59</div>
+      <div class="hcell" style="background:#CC9660;">0.61</div>
+      <div class="hcell" style="background:#C58549;">0.66</div>
+      <div class="hcell" style="background:#D0A26C;">0.69</div>
+    </div>
+    <p style="font-size:0.82rem; color:var(--ink-faint); margin-top:-8px;">Decline rate by impression tier (rows) × freshness tier (columns). Darker = higher decline rate.</p>
+    <p>The decline rate ranges from <b>0.38 to 1.00</b> depending on the combination of impression volume and freshness alone — a single if-statement threshold cannot capture a two-way interaction like this, which is the direct motivation for a learned model over a fixed rule.</p>
+    <h3>Validation design</h3>
+    <p>Two splits were compared deliberately, changing nothing else between them: an ordinary random 75/25 split, and a <code class="inline">GroupShuffleSplit</code> by <code class="inline">client_hash_id</code>, which guarantees no client appears in both train and test. The grouped split is the stricter, more honest test — it asks whether the model generalizes to clients it has never seen, not just to unseen rows from clients it already knows.</p>
+  </section>
+
+  <!-- ============ RESULTS ============ -->
+  <section id="results">
+    <div class="signal-strip" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+    <div class="sec-label">05 — Results</div>
+    <h2>Model vs. baseline, same split</h2>
+
+    <h3>Precision@50 — the metric that matches the decision</h3>
+    <p>Of the top 50 pages each approach ranks highest, what fraction are genuinely declining? This is the metric that matches how a reviewer actually works — down a short list, not across the whole dataset.</p>
+    <div class="barchart">
+      <div class="row">
+        <div class="row-label"><span>Random forest (top 50)</span><span class="val">1.000</span></div>
+        <div class="bar-track"><div class="bar-fill model" style="width:100%"></div></div>
+      </div>
+      <div class="row">
+        <div class="row-label"><span>Baseline — ranked by raw prior impressions</span><span class="val">0.540</span></div>
+        <div class="bar-track"><div class="bar-fill baseline" style="width:54%"></div></div>
+      </div>
+    </div>
+    <p style="font-size:0.85rem;color:var(--ink-faint);">Checked against a false-positive artifact: the top-50 predicted probabilities cluster near 0.995, not tied at an identical 1.0, and correspond to 50 distinct content items — consistent with genuine model confidence rather than a duplication or leakage bug.</p>
+
+    <h3>Does it generalize to clients it has never seen?</h3>
+    <p>Raw accuracy isn't directly comparable across the two splits, since each has a different base rate. What matters is <b>uplift over the base rate</b> in each case:</p>
+    <div class="barchart">
+      <div class="row">
+        <div class="row-label"><span>Random split — accuracy 0.781, base rate 0.617</span><span class="val">+0.164</span></div>
+        <div class="bar-track"><div class="bar-fill stable" style="width:65%"></div></div>
+      </div>
+      <div class="row">
+        <div class="row-label"><span>Grouped split (unseen clients) — accuracy 0.835, base rate 0.669</span><span class="val">+0.166</span></div>
+        <div class="bar-track"><div class="bar-fill stable" style="width:66%"></div></div>
+      </div>
+    </div>
+    <p>The uplift is nearly identical either way — evidence the model's advantage isn't an artifact of clients overlapping between training and test. Validated across <b>13 distinct clients</b> in the held-out grouped set.</p>
+
+    <h3>Does position volatility actually help?</h3>
+    <p>Tested directly with an ablation — identical split, identical everything else, only this one feature toggled:</p>
+    <div class="barchart">
+      <div class="row">
+        <div class="row-label"><span>With <code class="inline">pos_volatility</code></span><span class="val">0.835</span></div>
+        <div class="bar-track"><div class="bar-fill model" style="width:83.5%"></div></div>
+      </div>
+      <div class="row">
+        <div class="row-label"><span>Without <code class="inline">pos_volatility</code></span><span class="val">0.823</span></div>
+        <div class="bar-track"><div class="bar-fill baseline" style="width:82.3%"></div></div>
+      </div>
+    </div>
+    <p>A modest but real and consistent gain across precision, recall, and F1 — <code class="inline">pos_volatility</code> was also the second-most important feature by the model's own feature-importance ranking, behind prior impressions.</p>
+  </section>
+
+  <!-- ============ LIMITATIONS ============ -->
+  <section id="limits">
+    <div class="sec-label">06 — Limitations &amp; honest framing</div>
+    <h2>What this can and cannot claim</h2>
+    <div class="callout limit"><b>Can claim:</b> which pages show statistical evidence of decline, based on observed historical search signals — impressions, position, query concentration — and that a learned ranking outperforms a naive impressions-based ranking on this dataset.</div>
+    <div class="callout limit"><b>Cannot claim:</b> that refreshing a flagged page causes recovery. No controlled experiment (e.g. refreshed vs. non-refreshed pages, A/B tested) exists in this dataset — that would be required to support a causal claim.</div>
+    <div class="callout limit"><b>Cannot claim:</b> any reverse-engineering of a search engine's ranking algorithm. The model learns patterns in FlyRank's own observed performance data, nothing about how any search engine itself operates internally.</div>
+    <p>Two further honest caveats: a meaningful share of top-ranked recommendations receive tied, near-maximum confidence scores, meaning a secondary tiebreaker (e.g. raw impression volume, content age) would be needed for a strict top-N cutoff in production. And the grouped validation, while a genuinely stricter test than a random split, covers only 13 distinct clients in its held-out set — a real but modest sample for a claim about cross-client generalization.</p>
+  </section>
+
+  <!-- ============ RECOMMENDATIONS ============ -->
+  <section id="recs">
+    <div class="signal-strip" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+    <div class="sec-label">07 — Ranked recommendations</div>
+    <h2>From a score to an action</h2>
+    <p>A raw decline probability isn't itself an instruction. Crossing it with each page's current value (prior-period impressions) turns the score into four concrete actions a reviewer can take directly:</p>
+    <table>
+      <tr><th>Decline risk</th><th>Current value</th><th>Action</th></tr>
+      <tr><td class="num">High</td><td class="num">High</td><td><span class="tag refresh">Refresh urgently</span></td></tr>
+      <tr><td class="num">High</td><td class="num">Low</td><td><span class="tag monitor">Monitor</span></td></tr>
+      <tr><td class="num">Low</td><td class="num">High</td><td><span class="tag protect">Protect</span></td></tr>
+      <tr><td class="num">Low</td><td class="num">Low</td><td><span class="tag prune">Prune / merge candidate</span></td></tr>
+    </table>
+    <h3>Distribution across the held-out set (15,044 pages)</h3>
+    <div class="action-dist">
+      <div class="action-row"><span class="tag refresh">Refresh urgently</span><div class="bar-track"><div class="abar" style="width:100%;background:var(--decline);"></div></div><span class="mono">5,411</span></div>
+      <div class="action-row"><span class="tag monitor">Monitor</span><div class="bar-track"><div class="abar" style="width:84%;background:#C79A4A;"></div></div><span class="mono">4,554</span></div>
+      <div class="action-row"><span class="tag prune">Prune / merge</span><div class="bar-track"><div class="abar" style="width:55%;background:var(--ink-faint);"></div></div><span class="mono">2,964</span></div>
+      <div class="action-row"><span class="tag protect">Protect</span><div class="bar-track"><div class="abar" style="width:39%;background:var(--stable);"></div></div><span class="mono">2,115</span></div>
+    </div>
+  </section>
+
+  <!-- ============ REPRODUCIBILITY ============ -->
+  <section id="repro">
+    <div class="sec-label">08 — Reproducibility</div>
+    <h2>Notebooks and repo</h2>
+    <p>Every step in this paper — feature engineering over the full warehouse via DuckDB, the split comparison, the feature ablation, Precision@50, and the recommendation logic — is reproducible from the notebooks in the linked repository.</p>
+    <ul>
+      <li><a href="https://github.com/mahmii12/FlyRank-Assignment-" target="_blank" rel="noopener">Repository — mahmii12/FlyRank-Assignment-</a></li>
+      <li><code class="inline">work/notebooks/</code> — all weekly assignment notebooks (ML-02, ML-03, and the full-warehouse pipeline)</li>
+      <li><code class="inline">submission/paper_url.txt</code> — this page's deployed URL</li>
+    </ul>
+  </section>
+
+  <!-- ============ FOOTER / ACKNOWLEDGMENTS ============ -->
+  <footer>
+    <div class="signal-strip" aria-hidden="true" style="margin: 0 0 24px;"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+    <div class="sec-label">09 — Acknowledgments &amp; data credit</div>
+    <p>Built on the FlyRank ML Internship dataset — <a href="https://flyrank.ai" target="_blank" rel="noopener">flyrank.ai</a>.</p>
+  </footer>
+
+</div>
+
+</body>
+</html>
